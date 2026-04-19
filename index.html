@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sab's MDs — Markdown Dashboard</title>
+  <meta name="description" content="Paste, preview, and publish markdown documents instantly. Optionally lock them behind a token." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'], mono: ['JetBrains Mono', 'monospace'] },
+          colors: {
+            surface: { 50: '#f0f1f5', 100: '#e1e3eb', 700: '#1e2030', 800: '#181a2a', 900: '#12131f', 950: '#0b0c14' },
+            accent: { 400: '#818cf8', 500: '#6366f1', 600: '#4f46e5' },
+            mint: { 400: '#34d399', 500: '#10b981' },
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    *, *::before, *::after { scrollbar-width: thin; scrollbar-color: #6366f180 transparent; }
+    body { font-family: 'Inter', sans-serif; background: #0b0c14; }
+    .glass { background: rgba(30, 32, 48, 0.6); backdrop-filter: blur(18px) saturate(1.4); border: 1px solid rgba(99, 102, 241, 0.12); }
+    .glow { box-shadow: 0 0 40px -12px rgba(99, 102, 241, 0.35); }
+    .fade-in { animation: fadeIn 0.4s ease-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(99,102,241,.4); } 70% { box-shadow: 0 0 0 8px rgba(99,102,241,0); } }
+    .pulse-dot { animation: pulse-ring 2s infinite; }
+    .prose-md { color: #c9cbe0; line-height: 1.75; }
+    .prose-md h1 { font-size: 2em; font-weight: 800; color: #e0e2f0; margin: 1em 0 .4em; border-bottom: 1px solid #6366f130; padding-bottom: .3em; }
+    .prose-md h2 { font-size: 1.5em; font-weight: 700; color: #d4d6e8; margin: .9em 0 .3em; }
+    .prose-md h3 { font-size: 1.25em; font-weight: 600; color: #c0c3da; margin: .8em 0 .25em; }
+    .prose-md p { margin: .6em 0; }
+    .prose-md a { color: #818cf8; text-decoration: underline; }
+    .prose-md code { background: #181a2a; padding: 2px 6px; border-radius: 4px; font-family: 'JetBrains Mono', monospace; font-size: 0.88em; color: #a5b4fc; }
+    .prose-md pre { background: #12131f; border: 1px solid #ffffff0a; border-radius: 8px; padding: 1em; overflow-x: auto; margin: 1em 0; }
+    .prose-md pre code { background: none; padding: 0; color: #c9cbe0; }
+    .prose-md blockquote { border-left: 3px solid #6366f1; padding-left: 1em; color: #9a9cc0; margin: 1em 0; font-style: italic; }
+    .prose-md ul, .prose-md ol { padding-left: 1.5em; margin: .5em 0; }
+    .prose-md li { margin: .25em 0; }
+    .prose-md ul { list-style: disc; }
+    .prose-md ol { list-style: decimal; }
+    .prose-md img { max-width: 100%; border-radius: 8px; margin: 1em 0; }
+    .prose-md table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+    .prose-md th, .prose-md td { border: 1px solid #ffffff12; padding: .5em .75em; text-align: left; }
+    .prose-md th { background: #181a2a; font-weight: 600; color: #d4d6e8; }
+    .prose-md hr { border-color: #ffffff10; margin: 1.5em 0; }
+    textarea { resize: none; }
+    .btn-primary { background: linear-gradient(135deg, #6366f1, #4f46e5); transition: all .25s; }
+    .btn-primary:hover { box-shadow: 0 0 24px -4px rgba(99,102,241,.5); transform: translateY(-1px); }
+    .toggle-track { transition: background .25s; }
+    .toggle-thumb { transition: transform .25s; }
+    #overlay { transition: opacity .3s; }
+    .card-hover { transition: all .25s ease; }
+    .card-hover:hover { transform: translateY(-3px); box-shadow: 0 8px 30px -8px rgba(99,102,241,.2); }
+    .bg-mesh {
+      background-image: radial-gradient(at 20% 20%, rgba(99,102,241,.08) 0, transparent 50%),
+                         radial-gradient(at 80% 60%, rgba(52,211,153,.06) 0, transparent 50%);
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-surface-950 text-gray-200 bg-mesh">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="sticky top-0 z-50 glass border-b border-white/5">
+    <div class="max-w-6xl mx-auto flex items-center justify-between px-6 py-4">
+      <a href="#" onclick="showDashboard()" class="flex items-center gap-3 group">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-accent-500 to-accent-400 flex items-center justify-center text-white font-bold text-sm shadow-lg">M</div>
+        <h1 class="text-xl font-bold tracking-tight text-white">Sab's <span class="text-accent-400">MDs</span></h1>
+      </a>
+      <div class="flex items-center gap-3">
+        <span id="postCount" class="text-xs text-gray-500 font-mono hidden sm:inline"></span>
+        <button onclick="showDashboard()" class="text-sm text-gray-400 hover:text-white transition px-3 py-1.5 rounded-lg hover:bg-white/5">Dashboard</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== DASHBOARD VIEW ==================== -->
+  <main id="dashboardView" class="max-w-6xl mx-auto px-6 py-8 fade-in">
+
+    <!-- Composer Card -->
+    <section class="glass rounded-2xl p-6 md:p-8 glow mb-10">
+      <div class="flex items-center gap-2 mb-6">
+        <div class="w-2.5 h-2.5 rounded-full bg-accent-500 pulse-dot"></div>
+        <h2 class="text-lg font-semibold text-white">New Post</h2>
+      </div>
+
+      <!-- Title -->
+      <input id="mdTitle" type="text" placeholder="Give it a title…" class="w-full bg-surface-900/70 border border-white/5 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-accent-500/40 focus:ring-1 focus:ring-accent-500/20 transition mb-4 text-sm font-medium" />
+
+      <!-- Token Toggle -->
+      <div class="flex items-center justify-between mb-4 bg-surface-900/50 rounded-xl px-4 py-3 border border-white/5">
+        <div class="flex items-center gap-3">
+          <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+          <span class="text-sm text-gray-400">Lock behind token</span>
+        </div>
+        <button id="tokenToggle" onclick="toggleToken()" class="w-11 h-6 rounded-full toggle-track bg-surface-700 relative cursor-pointer border border-white/5">
+          <div id="tokenThumb" class="w-5 h-5 rounded-full bg-gray-400 absolute top-0.5 left-0.5 toggle-thumb shadow"></div>
+        </button>
+      </div>
+      <input id="mdToken" type="text" placeholder="Enter a secret token…" class="w-full bg-surface-900/70 border border-white/5 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-accent-500/40 transition mb-4 text-sm hidden" />
+
+      <!-- Editor + Preview -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <div class="flex flex-col">
+          <label class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Markdown</label>
+          <textarea id="mdEditor" rows="14" placeholder="Paste your markdown here…" class="flex-1 bg-surface-900/70 border border-white/5 rounded-xl px-4 py-3 text-gray-300 placeholder-gray-600 focus:outline-none focus:border-accent-500/40 focus:ring-1 focus:ring-accent-500/20 transition font-mono text-sm leading-relaxed"></textarea>
+        </div>
+        <div class="flex flex-col">
+          <label class="text-xs text-gray-500 uppercase tracking-wider font-semibold mb-2">Preview</label>
+          <div id="mdPreview" class="flex-1 bg-surface-900/70 border border-white/5 rounded-xl px-5 py-4 overflow-auto prose-md text-sm min-h-[200px] lg:min-h-0 max-h-[400px]">
+            <span class="text-gray-600 italic">Start typing to see a preview…</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Publish Button -->
+      <div class="flex justify-end">
+        <button id="publishBtn" onclick="publishPost()" class="btn-primary text-white font-semibold text-sm px-8 py-3 rounded-xl flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+          Publish
+        </button>
+      </div>
+    </section>
+
+    <!-- Published Posts Grid -->
+    <section id="postsSection" class="hidden">
+      <div class="flex items-center justify-between mb-6">
+        <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+          <svg class="w-5 h-5 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+          Your Posts
+        </h2>
+      </div>
+      <div id="postsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+  </main>
+
+  <!-- ==================== POST VIEWER ==================== -->
+  <main id="postViewer" class="max-w-4xl mx-auto px-6 py-10 hidden fade-in">
+    <button onclick="showDashboard()" class="text-sm text-gray-500 hover:text-accent-400 transition mb-6 flex items-center gap-1">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+      Back
+    </button>
+    <article class="glass rounded-2xl p-8 md:p-10 glow">
+      <h2 id="viewerTitle" class="text-3xl font-bold text-white mb-2"></h2>
+      <p id="viewerDate" class="text-xs text-gray-500 font-mono mb-8"></p>
+      <div id="viewerContent" class="prose-md"></div>
+    </article>
+  </main>
+
+  <!-- ==================== TOKEN OVERLAY ==================== -->
+  <div id="overlay" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[999] flex items-center justify-center hidden opacity-0">
+    <div class="glass rounded-2xl p-8 w-full max-w-sm mx-4 text-center glow fade-in">
+      <div class="w-14 h-14 mx-auto mb-5 rounded-full bg-accent-500/10 flex items-center justify-center">
+        <svg class="w-7 h-7 text-accent-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+      </div>
+      <h3 class="text-lg font-bold text-white mb-2">This post is locked</h3>
+      <p class="text-sm text-gray-400 mb-5">Enter the token to view this document.</p>
+      <input id="tokenInput" type="password" placeholder="Token" class="w-full bg-surface-900 border border-white/10 rounded-xl px-4 py-3 text-white text-center placeholder-gray-500 focus:outline-none focus:border-accent-500/40 transition mb-4 text-sm" onkeydown="if(event.key==='Enter')unlockPost()" />
+      <button onclick="unlockPost()" class="btn-primary w-full text-white font-semibold text-sm py-3 rounded-xl">Unlock</button>
+      <p id="tokenError" class="text-red-400 text-xs mt-3 hidden">Wrong token. Try again.</p>
+    </div>
+  </div>
+
+  <!-- ==================== TOAST ==================== -->
+  <div id="toast" class="fixed bottom-6 right-6 z-[1000] glass rounded-xl px-5 py-3 text-sm font-medium text-white shadow-xl translate-y-20 opacity-0 transition-all duration-300 pointer-events-none flex items-center gap-2">
+    <svg class="w-4 h-4 text-mint-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+    <span id="toastMsg"></span>
+  </div>
+
+  <script>
+    // ──── State ────
+    const STORAGE_KEY = 'sabs_mds_posts';
+    let tokenEnabled = false;
+    let pendingPostId = null;
+
+    // ──── Helpers ────
+    function getPosts() { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+    function savePosts(posts) { localStorage.setItem(STORAGE_KEY, JSON.stringify(posts)); }
+    function genId() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+    function toast(msg) {
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      t.classList.remove('translate-y-20', 'opacity-0');
+      setTimeout(() => t.classList.add('translate-y-20', 'opacity-0'), 2500);
+    }
+
+    function renderMarkdown(md) {
+      return DOMPurify.sanitize(marked.parse(md || '', { breaks: true, gfm: true }));
+    }
+
+    // ──── Token Toggle ────
+    function toggleToken() {
+      tokenEnabled = !tokenEnabled;
+      const track = document.getElementById('tokenToggle');
+      const thumb = document.getElementById('tokenThumb');
+      const input = document.getElementById('mdToken');
+      if (tokenEnabled) {
+        track.classList.replace('bg-surface-700', 'bg-accent-500');
+        thumb.style.transform = 'translateX(20px)';
+        thumb.classList.replace('bg-gray-400', 'bg-white');
+        input.classList.remove('hidden');
+        input.focus();
+      } else {
+        track.classList.replace('bg-accent-500', 'bg-surface-700');
+        thumb.style.transform = 'translateX(0)';
+        thumb.classList.replace('bg-white', 'bg-gray-400');
+        input.classList.add('hidden');
+        input.value = '';
+      }
+    }
+
+    // ──── Live Preview ────
+    document.getElementById('mdEditor').addEventListener('input', function () {
+      const preview = document.getElementById('mdPreview');
+      if (this.value.trim()) {
+        preview.innerHTML = renderMarkdown(this.value);
+      } else {
+        preview.innerHTML = '<span class="text-gray-600 italic">Start typing to see a preview…</span>';
+      }
+    });
+
+    // ──── Publish ────
+    function publishPost() {
+      const title = document.getElementById('mdTitle').value.trim();
+      const body = document.getElementById('mdEditor').value.trim();
+      const token = document.getElementById('mdToken').value.trim();
+
+      if (!title) { toast('Please add a title'); return; }
+      if (!body) { toast('Paste some markdown first'); return; }
+      if (tokenEnabled && !token) { toast('Enter a token or disable lock'); return; }
+
+      const post = {
+        id: genId(),
+        title,
+        body,
+        token: tokenEnabled ? token : null,
+        date: new Date().toISOString()
+      };
+
+      const posts = getPosts();
+      posts.unshift(post);
+      savePosts(posts);
+
+      // Reset form
+      document.getElementById('mdTitle').value = '';
+      document.getElementById('mdEditor').value = '';
+      document.getElementById('mdToken').value = '';
+      document.getElementById('mdPreview').innerHTML = '<span class="text-gray-600 italic">Start typing to see a preview…</span>';
+      if (tokenEnabled) toggleToken();
+
+      renderPosts();
+      toast('Published!');
+    }
+
+    // ──── Render Post Cards ────
+    function renderPosts() {
+      const posts = getPosts();
+      const section = document.getElementById('postsSection');
+      const grid = document.getElementById('postsGrid');
+      const counter = document.getElementById('postCount');
+
+      counter.textContent = posts.length + ' post' + (posts.length !== 1 ? 's' : '');
+
+      if (!posts.length) { section.classList.add('hidden'); return; }
+      section.classList.remove('hidden');
+
+      grid.innerHTML = posts.map(p => {
+        const d = new Date(p.date);
+        const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const snippet = p.body.replace(/[#*`>\-\[\]()!]/g, '').slice(0, 100).trim();
+        return `
+          <div class="glass rounded-xl p-5 card-hover cursor-pointer group" onclick="openPost('${p.id}')">
+            <div class="flex items-start justify-between mb-3">
+              <h3 class="font-semibold text-white text-sm group-hover:text-accent-400 transition truncate pr-3">${esc(p.title)}</h3>
+              ${p.token ? '<svg class="w-4 h-4 text-yellow-500/70 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>' : ''}
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">${esc(snippet)}…</p>
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] text-gray-600 font-mono">${dateStr}</span>
+              <button onclick="event.stopPropagation();deletePost('${p.id}')" class="text-gray-600 hover:text-red-400 transition p-1 rounded-md hover:bg-red-500/10" title="Delete">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ──── Open / View ────
+    function openPost(id) {
+      const post = getPosts().find(p => p.id === id);
+      if (!post) return;
+
+      if (post.token) {
+        pendingPostId = id;
+        const ov = document.getElementById('overlay');
+        ov.classList.remove('hidden');
+        requestAnimationFrame(() => ov.classList.remove('opacity-0'));
+        document.getElementById('tokenInput').value = '';
+        document.getElementById('tokenError').classList.add('hidden');
+        document.getElementById('tokenInput').focus();
+      } else {
+        displayPost(post);
+      }
+    }
+
+    function unlockPost() {
+      const post = getPosts().find(p => p.id === pendingPostId);
+      const input = document.getElementById('tokenInput').value;
+      if (input === post.token) {
+        closeOverlay();
+        displayPost(post);
+      } else {
+        document.getElementById('tokenError').classList.remove('hidden');
+        document.getElementById('tokenInput').classList.add('border-red-500/50');
+        setTimeout(() => document.getElementById('tokenInput').classList.remove('border-red-500/50'), 1000);
+      }
+    }
+
+    function closeOverlay() {
+      const ov = document.getElementById('overlay');
+      ov.classList.add('opacity-0');
+      setTimeout(() => ov.classList.add('hidden'), 300);
+      pendingPostId = null;
+    }
+
+    function displayPost(post) {
+      document.getElementById('dashboardView').classList.add('hidden');
+      const viewer = document.getElementById('postViewer');
+      viewer.classList.remove('hidden');
+      viewer.classList.add('fade-in');
+      document.getElementById('viewerTitle').textContent = post.title;
+      document.getElementById('viewerDate').textContent = new Date(post.date).toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
+      document.getElementById('viewerContent').innerHTML = renderMarkdown(post.body);
+    }
+
+    function showDashboard() {
+      document.getElementById('postViewer').classList.add('hidden');
+      document.getElementById('dashboardView').classList.remove('hidden');
+      renderPosts();
+    }
+
+    // ──── Delete ────
+    function deletePost(id) {
+      if (!confirm('Delete this post?')) return;
+      const posts = getPosts().filter(p => p.id !== id);
+      savePosts(posts);
+      renderPosts();
+      toast('Post deleted');
+    }
+
+    // ──── Init ────
+    renderPosts();
+  </script>
+</body>
+</html>
