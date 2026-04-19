@@ -61,6 +61,10 @@
     #overlay { transition: opacity .3s; }
     .card-hover { transition: all .25s ease; }
     .card-hover:hover { transform: translateY(-3px); box-shadow: 0 8px 30px -8px rgba(99,102,241,.2); }
+    .share-btn { transition: all .2s ease; }
+    .share-btn:hover { color: #818cf8; background: rgba(99,102,241,.1); }
+    .share-copied { animation: copiedPop .5s ease; }
+    @keyframes copiedPop { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
     .bg-mesh {
       background-image: radial-gradient(at 20% 20%, rgba(99,102,241,.08) 0, transparent 50%),
                          radial-gradient(at 80% 60%, rgba(52,211,153,.06) 0, transparent 50%);
@@ -145,10 +149,16 @@
 
   <!-- ==================== POST VIEWER ==================== -->
   <main id="postViewer" class="max-w-4xl mx-auto px-6 py-10 hidden fade-in">
-    <button onclick="showDashboard()" class="text-sm text-gray-500 hover:text-accent-400 transition mb-6 flex items-center gap-1">
-      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-      Back
-    </button>
+    <div class="flex items-center justify-between mb-6">
+      <button onclick="showDashboard()" class="text-sm text-gray-500 hover:text-accent-400 transition flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        Back
+      </button>
+      <button id="viewerShareBtn" onclick="shareCurrentPost()" class="share-btn text-sm text-gray-400 flex items-center gap-2 px-3 py-1.5 rounded-lg border border-white/5" title="Copy share link">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+        Share
+      </button>
+    </div>
     <article class="glass rounded-2xl p-8 md:p-10 glow">
       <h2 id="viewerTitle" class="text-3xl font-bold text-white mb-2"></h2>
       <p id="viewerDate" class="text-xs text-gray-500 font-mono mb-8"></p>
@@ -287,9 +297,14 @@
             <p class="text-xs text-gray-500 leading-relaxed mb-3 line-clamp-2">${esc(snippet)}…</p>
             <div class="flex items-center justify-between">
               <span class="text-[10px] text-gray-600 font-mono">${dateStr}</span>
-              <button onclick="event.stopPropagation();deletePost('${p.id}')" class="text-gray-600 hover:text-red-400 transition p-1 rounded-md hover:bg-red-500/10" title="Delete">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-              </button>
+              <div class="flex items-center gap-1">
+                <button onclick="event.stopPropagation();sharePost('${p.id}')" class="share-btn text-gray-600 p-1 rounded-md" title="Share">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                </button>
+                <button onclick="event.stopPropagation();deletePost('${p.id}')" class="text-gray-600 hover:text-red-400 transition p-1 rounded-md hover:bg-red-500/10" title="Delete">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+              </div>
             </div>
           </div>`;
       }).join('');
@@ -316,9 +331,14 @@
     }
 
     function unlockPost() {
-      const post = getPosts().find(p => p.id === pendingPostId);
+      let post;
+      if (pendingPostId === '__shared__') {
+        post = window.__sharedPost;
+      } else {
+        post = getPosts().find(p => p.id === pendingPostId);
+      }
       const input = document.getElementById('tokenInput').value;
-      if (input === post.token) {
+      if (post && input === post.token) {
         closeOverlay();
         displayPost(post);
       } else {
@@ -335,7 +355,10 @@
       pendingPostId = null;
     }
 
+    let currentViewingPost = null;
+
     function displayPost(post) {
+      currentViewingPost = post;
       document.getElementById('dashboardView').classList.add('hidden');
       const viewer = document.getElementById('postViewer');
       viewer.classList.remove('hidden');
@@ -360,8 +383,82 @@
       toast('Post deleted');
     }
 
+    // ──── Share ────
+    function encodePost(post) {
+      const payload = JSON.stringify({ t: post.title, b: post.body, d: post.date, k: post.token || null });
+      return btoa(unescape(encodeURIComponent(payload)));
+    }
+
+    function decodePost(hash) {
+      try {
+        const json = decodeURIComponent(escape(atob(hash)));
+        const data = JSON.parse(json);
+        return { id: 'shared', title: data.t, body: data.b, date: data.d, token: data.k };
+      } catch (e) { return null; }
+    }
+
+    function buildShareUrl(post) {
+      return window.location.origin + window.location.pathname + '#share=' + encodePost(post);
+    }
+
+    function copyToClipboard(text) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+      }
+      // Fallback
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return Promise.resolve();
+    }
+
+    function sharePost(id) {
+      const post = getPosts().find(p => p.id === id);
+      if (!post) return;
+      const url = buildShareUrl(post);
+      copyToClipboard(url).then(() => toast('Share link copied!'));
+    }
+
+    function shareCurrentPost() {
+      if (!currentViewingPost) return;
+      const url = buildShareUrl(currentViewingPost);
+      copyToClipboard(url).then(() => {
+        toast('Share link copied!');
+        const btn = document.getElementById('viewerShareBtn');
+        btn.classList.add('share-copied');
+        setTimeout(() => btn.classList.remove('share-copied'), 500);
+      });
+    }
+
+    function loadFromShareLink() {
+      const hash = window.location.hash;
+      if (!hash.startsWith('#share=')) return false;
+      const encoded = hash.slice(7);
+      const post = decodePost(encoded);
+      if (!post) { toast('Invalid share link'); return false; }
+      if (post.token) {
+        pendingPostId = '__shared__';
+        window.__sharedPost = post;
+        const ov = document.getElementById('overlay');
+        ov.classList.remove('hidden');
+        requestAnimationFrame(() => ov.classList.remove('opacity-0'));
+        document.getElementById('tokenInput').value = '';
+        document.getElementById('tokenError').classList.add('hidden');
+        document.getElementById('tokenInput').focus();
+      } else {
+        displayPost(post);
+      }
+      return true;
+    }
+
     // ──── Init ────
-    renderPosts();
+    if (!loadFromShareLink()) {
+      renderPosts();
+    } else {
+      renderPosts();
+    }
   </script>
 </body>
 </html>
