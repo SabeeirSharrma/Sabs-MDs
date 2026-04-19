@@ -1,4 +1,4 @@
-<![CDATA[# Sab's MDs
+# Sab's MDs
 
 A sleek, client-side Markdown dashboard for writing, previewing, and sharing Markdown documents — all from a single static HTML file.
 
@@ -101,4 +101,3 @@ Sabs-MDs/
 ## 📄 License
 
 This project is open source. Feel free to fork and modify.
-]]>
